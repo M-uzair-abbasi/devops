@@ -12,46 +12,55 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 18
-
       - name: Install dependencies
         run: npm install
-
       - name: Run linting
         run: npm run lint
-
       - name: Run tests
         run: npm test -- --watchAll=false
 
   build:
     runs-on: ubuntu-latest
     needs: test
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 18
-
       - name: Install dependencies
         run: npm install
-
       - name: Build the app
         run: PUBLIC_URL=/ npm run build
-
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: react-build
           path: build
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: react-build
+          path: build
+      - name: Deploy to EC2 via rsync
+        uses: burnett01/rsync-deployments@6.0.0
+        with:
+          switches: -vzr --delete --omit-dir-times
+          path: ./build/*
+          remote_path: /var/www/html/
+          remote_host: ${{ vars.EC2_HOST }}
+          remote_user: ${{ vars.EC2_USER }}
+          remote_key: ${{ secrets.EC2_PRIVATE_KEY }}
